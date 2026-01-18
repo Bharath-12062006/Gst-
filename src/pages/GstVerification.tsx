@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 interface GstDetails {
     legalName: string;
@@ -11,20 +12,55 @@ const GstVerification: React.FC = () => {
     const [gstNumber, setGstNumber] = useState('');
     const [loading, setLoading] = useState(false);
     const [details, setDetails] = useState<GstDetails | null>(null);
+    const navigate = useNavigate();
 
-    const handleVerify = (e: React.FormEvent) => {
+    const handleVerify = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
         setDetails(null);
 
-        setTimeout(() => {
-            setLoading(false);
-            setDetails({
-                legalName: 'TATA CONSULTANCY SERVICES LIMITED',
-                tradeName: 'TCS',
-                status: 'Active',
+        const storedUser = localStorage.getItem('gst_user');
+        if (!storedUser) {
+            alert('Please login first');
+            navigate('/');
+            return;
+        }
+
+        const user = JSON.parse(storedUser);
+
+        // Mock GST API lookup result
+        const mockDetails = {
+            legalName: 'TATA CONSULTANCY SERVICES LIMITED',
+            tradeName: 'TCS',
+            status: 'Active',
+        };
+
+        try {
+            const response = await fetch(`http://localhost:5000/api/users/${user._id}/gst`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    gstNumber,
+                    details: mockDetails
+                }),
             });
-        }, 1500);
+
+            if (response.ok) {
+                const updatedUser = await response.json();
+                localStorage.setItem('gst_user', JSON.stringify({ ...user, ...updatedUser }));
+
+                setTimeout(() => {
+                    setLoading(false);
+                    setDetails(mockDetails);
+                }, 1500);
+            } else {
+                setLoading(false);
+                alert('Failed to verify GST');
+            }
+        } catch (error) {
+            setLoading(false);
+            alert('Error connecting to server');
+        }
     };
 
     return (

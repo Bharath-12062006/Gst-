@@ -11,20 +11,37 @@ const Login: React.FC = () => {
     const [message, setMessage] = useState('');
     const navigate = useNavigate();
 
-    const handleData = (e: React.FormEvent) => {
+    const handleData = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
         setMessage('');
 
         if (isLogin) {
             // Login Logic
-            const storedUsers = JSON.parse(localStorage.getItem('gst_users') || '[]');
-            const user = storedUsers.find((u: any) => u.email === email && u.password === password);
+            try {
+                const response = await fetch('http://localhost:5000/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password }),
+                });
 
-            if (user) {
-                navigate('/verify-pan');
-            } else {
-                setError('Invalid email or password. Please sign up if you do not have an account.');
+                const data = await response.json();
+
+                if (response.ok) {
+                    localStorage.setItem('gst_user', JSON.stringify(data));
+                    if (data.validPan && data.validGst) {
+                        // Could redirect to dashboard directly if all verifications done
+                        alert('Verification already complete!');
+                    } else if (data.validPan) {
+                        navigate('/verify-gst');
+                    } else {
+                        navigate('/verify-pan');
+                    }
+                } else {
+                    setError(data.message || 'Login failed');
+                }
+            } catch (err) {
+                setError('Failed to connect to server');
             }
         } else {
             // Signup Logic
@@ -33,22 +50,26 @@ const Login: React.FC = () => {
                 return;
             }
 
-            const storedUsers = JSON.parse(localStorage.getItem('gst_users') || '[]');
-            const userExists = storedUsers.some((u: any) => u.email === email);
+            try {
+                const response = await fetch('http://localhost:5000/api/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password }),
+                });
 
-            if (userExists) {
-                setError('User already exists. Please login.');
-                return;
+                const data = await response.json();
+
+                if (response.ok) {
+                    setMessage('Account created successfully! Please sign in.');
+                    setIsLogin(true); // Switch to login mode
+                    setPassword('');
+                    setConfirmPassword('');
+                } else {
+                    setError(data.message || 'Registration failed');
+                }
+            } catch (err) {
+                setError('Failed to connect to server');
             }
-
-            const newUser = { email, password };
-            localStorage.setItem('gst_users', JSON.stringify([...storedUsers, newUser]));
-
-            setMessage('Account created successfully! Please sign in.');
-            setIsLogin(true); // Switch to login mode
-            // Clear passwords for security/UX
-            setPassword('');
-            setConfirmPassword('');
         }
     };
 
